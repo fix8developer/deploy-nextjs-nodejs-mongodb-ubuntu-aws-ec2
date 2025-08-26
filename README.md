@@ -141,7 +141,7 @@ On your VPS, clone your application's Git repository to a suitable directory (e.
 ```bash
 mkdir -p /var/www/
 cd /var/www/
-sudo git clone https://github.com/Project-Buck/R3_Diagnostics_Website.git myapp
+sudo git clone https://<Personal Access Token (PAT)>@github.com/Project-Buck/R3_Diagnostics_Website.git myapp
 cd myapp
 ```
 
