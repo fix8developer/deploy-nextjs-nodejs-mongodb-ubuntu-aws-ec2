@@ -376,11 +376,130 @@ Test your Nginx configuration with sudo nginx -t and reload Nginx with sudo syst
       sudo env PATH=$PATH:/home/grader/.nvm/versions/node/v22.18.0/bin /home/grader/.nvm/versions/node/v22.18.0/lib/node_modules/pm2/bin/pm2 startup systemd -u grader --hp /home/grader
       ```
 
-## 5. Secure Your Application (Optional but Recommended)
+## 5. Secure Your Application with HTTPS (SSL Certificate)
 
-- Install Certbot: Install Certbot to easily obtain and manage SSL certificates from Let's Encrypt for HTTPS encryption.
-- Obtain SSL Certificate: Use Certbot to obtain an SSL certificate for your domain and configure Nginx to use it.
-- Automate Renewal: Configure Certbot to automatically renew your SSL certificates.
+### Step 1: Install Certbot
+
+- Install Certbot to easily obtain and manage SSL certificates. It is the official tool for acquiring Let’s Encrypt certificates and automatically configuring Nginx.
+
+    ```bash
+    sudo apt update
+    sudo apt install certbot python3-certbot-nginx -y
+    ```
+
+### Step 2: Ensure Nginx is properly configured
+
+- Use Certbot to obtain an SSL certificate for your domain and configure Nginx to use it.
+
+    ```bash
+    sudo certbot --nginx -d your_domain.com -d www.your_domain.com
+    ```
+
+  - Follow prompts:
+    - Enter email (for renewal notices)
+    - Agree to terms
+    - Certbot will automatically configure Nginx for HTTPS
+
+### Step 3: Automatic renewal
+
+- Configure Certbot to automatically renew your SSL certificates. Let’s Encrypt certificates are valid for 90 days. Certbot can auto-renew:
+
+    ```bash
+    sudo systemctl status certbot.timer
+    ```
+
+- Or test renewal manually:
+
+    ```bash
+    sudo certbot renew --dry-run
+    ```
+
+### Step 4: Update the Nginx configuration for HTTP → HTTPS
+
+- Edit your Nginx server block:
+
+    ```bash
+    sudo nano /etc/nginx/sites-available/myapp
+    ```
+
+- Replace old with this configuration:
+
+    ```bash
+    # Redirect all HTTP requests to HTTPS
+    server {
+        listen 80;
+        server_name your_domain.com www.your_domain.com;
+
+        location / {
+            return 301 https://$host$request_uri;
+        }
+    }
+
+    # HTTPS server block
+    server {
+        listen 443 ssl;
+        server_name your_domain.com www.your_domain.com;
+
+        ssl_certificate /etc/letsencrypt/live/your_domain.com/fullchain.pem;
+        ssl_certificate_key /etc/letsencrypt/live/your_domain.com/privkey.pem;
+        include /etc/letsencrypt/options-ssl-nginx.conf;
+        ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+        location / {
+            proxy_pass http://127.0.0.1:3000;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+            proxy_cache_bypass $http_upgrade;
+        }
+    }
+    ```
+
+    ✅ Make sure to replace your_domain.com with your actual domain name.
+
+### Step 5: Check and Enable Nginx Configuration Again
+
+```bash
+# Disable the default site
+sudo rm /etc/nginx/sites-enabled/default
+sudo unlink /etc/nginx/sites-enabled/default
+
+# Ensure your site config is enabled
+sudo ln -s /etc/nginx/sites-available/myapp /etc/nginx/sites-enabled/
+
+# Test Nginx configuration
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### Step 6: Clear build and cache
+
+```bash
+# Clear Next.js build and cache
+cd /var/www/myapp/
+rm -rf .next
+rm -rf node_modules
+npm install
+
+# Rebuild Next.js
+npm run build
+
+# Stop PM2 completely
+pm2 stop myapp
+pm2 delete myapp
+
+# Start fresh with PM2
+pm2 start npm --name "myapp" -- run start
+pm2 save
+
+# Reload Nginx:
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+---
+---
 
 By following these steps, you can successfully deploy your Next.js and Node.js application with MongoDB on an Ubuntu VPS, ensuring it's accessible, secure, and running reliably.
 
